@@ -14,6 +14,16 @@ import pandas as pd
 import codecs
 import seaborn as sns
 
+from sklearn import tree
+from sklearn.tree import DecisionTreeClassifier
+from sklearn.ensemble import RandomForestClassifier
+from sklearn.svm import SVC
+from sklearn.model_selection import train_test_split
+from sklearn.model_selection import GridSearchCV
+
+from sklearn.preprocessing import StandardScaler
+from sklearn.preprocessing import MinMaxScaler
+
 # 評価関数
 # 分類
 from sklearn.metrics import confusion_matrix
@@ -68,13 +78,16 @@ def pro_read_csv(path, encoding='utf-8', usecols=None):
     return df
 
 
-def check_var_info(df, file_name='', filecol_is=False, transcol_is=True):
+def check_var_info(df, target=None, file_name='', filecol_is=False, transcol_is=True):
     """
     DataFrameの各カラムの示す変数の概要をまとめる。
 
     Args:
         df: DataFrame
             概要を調べるDataFrame。
+        
+        target: str, optional(default=None)
+            目的変数となるカラム名。Noneの時はtarget関連のカラムは作成しない。
         
         file_name: str, optional(default='')
             DataFrameが保存されていたファイルの名前。一応パスではない想定。
@@ -89,17 +102,24 @@ def check_var_info(df, file_name='', filecol_is=False, transcol_is=True):
         var_info_df: DataFrame
             各カラムの示す変数の概要をまとめたDataFrame。
             columns:
-                file_name:      ファイル名
-                var_name:       変数名
-                var_name_ja:    変数名の日本語訳
-                dtype:          データ型
-                n_unique:       値の種類数
-                major_vals:     最も多数派の値
-                count_of_major: 多数派が占めるレコード数
-                missing_rate:   欠損率
-                n_exist:        非欠損数
-                n_missing:      欠損数
-                n_rows:         行数。レコード数。
+                file_name:          ファイル名
+                var_name:           変数名
+                var_name_ja:        変数名の日本語訳
+                dtype:              データ型
+                n_unique:           値の種類数
+                major_vals:         最も多数派の値
+                count_of_major:     多数派が占めるレコード数
+                missing_rate:       欠損率
+                n_exist:            非欠損数
+                n_missing:          欠損数
+                n_rows:             行数。レコード数。
+                mean:               平均値
+                std:                標準偏差
+                min:                最小値
+                med:                中央値
+                max:                最大値
+                corr_with_target:   目的変数との相関
+                abs_corr_with_target: 目的変数との相関の絶対値
     
     Examples:
     
@@ -123,7 +143,9 @@ def check_var_info(df, file_name='', filecol_is=False, transcol_is=True):
         'std': '標準偏差',
         'min': '最小値',
         'med': '中央値',
-        'max': '最大値'
+        'max': '最大値',
+        'corr_with_target': '目的変数との相関',
+        'abs_corr_with_target': '目的変数との相関_絶対値'
     }
     var_info_df = var_info_df.rename(columns=enja_dict)
     """
@@ -142,9 +164,20 @@ def check_var_info(df, file_name='', filecol_is=False, transcol_is=True):
         'n_rows'            # 行数。レコード数。
     ]
 
+    key = 'var_name'
+    var_info_df = pd.DataFrame(columns=[key])
+    df_cols = df.columns.tolist()
+    var_info_df[key] = df_cols
+
     # 基礎統計料
     basic_stat_cols = ['mean', 'std', 'min', 'med','max']
     var_info_cols += basic_stat_cols
+
+    # targetとの相関
+    # targetがNoneでなく、df_colsの中にある時
+    if (not target is None) and (target in df_cols):
+        corr_cols = ['corr_with_target', 'abs_corr_with_target']
+        var_info_cols += corr_cols
 
     if not filecol_is:
         var_info_cols.remove('file_name')
@@ -152,11 +185,6 @@ def check_var_info(df, file_name='', filecol_is=False, transcol_is=True):
     if not transcol_is:
         var_info_cols.remove('var_name_ja')
     
-    key = 'var_name'
-    var_info_df = pd.DataFrame(columns=[key])
-    df_cols = df.columns.tolist()
-    var_info_df[key] = df_cols
-
     # ファイル名
     if filecol_is:
         var_info_df['file_name'] = file_name
@@ -220,6 +248,19 @@ def check_var_info(df, file_name='', filecol_is=False, transcol_is=True):
     bst_df.columns = [key] + basic_stat_cols
     var_info_df = pd.merge(var_info_df, bst_df, on=key, how='outer')
 
+    # targetとの相関
+    # targetがNoneでなく、df_colsの中にある時
+    if (not target is None) and (target in df_cols):
+        corr_df = df.corr()
+        target_corr_df = corr_df[[target]]
+        target_corr_df[corr_cols[1]] = target_corr_df[target].apply(abs)
+        target_corr_df = target_corr_df.reset_index()
+        target_corr_df.columns = [key, corr_cols[0], corr_cols[1]]
+        var_info_df = pd.merge(var_info_df, target_corr_df, on=key, how='outer')
+        del corr_df
+        gc.collect()
+
+
     # 整理
     var_info_df = var_info_df.reset_index(drop=True)[var_info_cols]
 
@@ -245,6 +286,7 @@ def check_data_list(path_list, encoding='utf-8'):
 
             var_info_df: DataFrame
                 カラムの概要をまとめたDataFrame。
+                check_var_info()参照。
     """
     n_files = len(path_list)    # file数
     print('num of all files:', n_files)
@@ -294,7 +336,7 @@ def check_data_list(path_list, encoding='utf-8'):
         tmp = pd.DataFrame([[path, file_name, n_rows, n_cols, columns]], columns=info_cols)
         data_info_df = data_info_df.append(tmp)
 
-        var_tmp = check_var_info(df, file_name=file_name, filecol_is=True, transcol_is=True)
+        var_tmp = check_var_info(df, target=None, file_name=file_name, filecol_is=True, transcol_is=True)
         var_info_df = var_info_df.append(var_tmp)
 
         # 掃除
@@ -515,4 +557,248 @@ def get_classes(in_df, columns=None, n_classes=1, drop=False, suffix='_band'):
             out_df = out_df.drop(col, axis=1)
     
     return out_df, bins_dict
+
+
+def get_cross(df, target=None, cols=[], normalize=False):
+    """
+    クロス集計をする。pd.crosstabを使用。
+
+    Args:
+        df: DataFrame
+            クロス集計をしたいDataFrame。
+        
+        target: str, optional(default=None)
+            カウント対象の変数名。目的変数などを想定。
+            Noneの時は該当するレコード数をカウントするのみ。
+        
+        cols: list of str, optional(default=[])
+            クロス集計対象となるカラム一覧。dfに存在するカラムのみを想定。
+        
+        normalize: bool, optional(default=False)
+            カウントだけでなく、割合も計算するかどうか。
+            Trueの時計算する。targetを1つ指定している時のみ使用可能。
+    
+    Returns:
+        cross_df: DataFrame
+            クロス集計を行ったDataFrame。
+    """
+    tmp = df.copy()
+    
+    # カテゴリカルな説明変数などをクロス集計のindexに使用するためセット
+    cross_idxes = []
+    # dfに存在するカラムのみにする
+    cols = [str(ii) for ii in cols if str(ii) in tmp.columns.tolist()]
+    for col in cols:
+        cross_idxes.append(tmp[col])
+    
+    # 目的変数などをクロス集計のcolumnsに使用するためセット
+    cross_cols = []
+    if (type(target) == str)and(str(target) in tmp.columns.tolist()):
+        cross_cols = [tmp[target]]
+    
+    # クロス集計を算出
+    cross_df = pd.crosstab(index=cross_idxes, columns=cross_cols, margins=True, normalize=False).reset_index(drop=False)
+    cross_df = cross_df.rename(columns={'__dummy__': 'all_count'})
+    
+    if len(cross_cols) == 1:
+        cross_df = cross_df.rename(columns=(lambda x: x if not(x in tmp[target].unique().tolist()) else target + '_' + str(x) + '_count'))
+    
+    # 割合のクロス集計を算出
+    if (normalize)and(len(cross_cols) == 1):
+        norm_cross_df = pd.crosstab(index=cross_idxes, columns=cross_cols, margins=False, normalize='index').reset_index(drop=False)
+        norm_cross_df.drop(labels=cols, inplace=True, axis=1)
+        norm_cross_df = norm_cross_df.rename(columns=(lambda x: x if not(x in tmp[target].unique().tolist()) else target + '_' + str(x) + '_ratio'))
+        cross_df = pd.merge(cross_df, norm_cross_df, left_index=True, right_index=True, how='outer')
+    del cross_df.columns.name
+    gc.collect()
+
+    return cross_df
+
+
+# score_func: 評価関数
+def rfc_gridsearch(data_x, data_y, param_grid, evaluation='accuracy', n_cv=10):
+    """
+    sklearn.ensemble.RandomForestClassifier()の
+    GridSearchを行う。
+
+    Args:
+        data_x: array-like or sparse matrix of shape = [n_samples, n_features]
+            説明変数。
+        
+        data_y: array-like, shape = [n_samples] or [n_samples, n_outputs]
+            目的変数。
+        
+        param_grid: dict
+            変化させるパラメータの値。
+        
+        evaluation: str, optional(default='accuracy')
+            評価関数。
+            評価関数evaluationで指定できるもの: 
+                ‘accuracy’	metrics.accuracy_score
+                ‘balanced_accuracy’	metrics.balanced_accuracy_score	for binary targets
+                ‘average_precision’	metrics.average_precision_score
+                ‘brier_score_loss’	metrics.brier_score_loss
+                ‘f1’	metrics.f1_score	for binary targets
+                ‘f1_micro’	metrics.f1_score	micro-averaged
+                ‘f1_macro’	metrics.f1_score	macro-averaged
+                ‘f1_weighted’	metrics.f1_score	weighted average
+                ‘f1_samples’	metrics.f1_score	by multilabel sample
+                ‘neg_log_loss’	metrics.log_loss	requires predict_proba support
+                ‘precision’ etc.	metrics.precision_score	suffixes apply as with ‘f1’
+                ‘recall’ etc.	metrics.recall_score	suffixes apply as with ‘f1’
+                ‘roc_auc’
+        
+        n_cv: int, optional(default=10)
+            grid searchでcross validationをする際の分割数。
+    
+    Returns:
+        gs: instance of GridSearchCV
+            grid searchのインスタンス。
+    
+    Examples:
+    
+    evaluations_list = ['accuracy', 'f1', 'precision', 'recall']
+    for eval_func in evaluations_list:
+        gs = rfc_gridsearch(data_X, data_y, evaluation=eval_func)
+        print('__________________________________________________________________  ')
+    
+    Remarks:
+        RandomForestClassifier:
+            https://scikit-learn.org/stable/modules/generated/sklearn.ensemble.RandomForestClassifier.html
+
+        GridSearchCV:
+            https://scikit-learn.org/stable/modules/generated/sklearn.model_selection.GridSearchCV.html
+    """
+    # ランダムフォレストのインスタンスを作成
+    rfc_gs = RandomForestClassifier(random_state=57)
+
+    # ハイパーパラメータ値のリスト
+    if type(param_grid) == dict:
+        param_grid = [param_grid]
+    else:
+        param_grid = [{
+            'n_estimators':[i for i in range(10,50,5)],
+            'criterion':['gini','entropy'],
+            'max_depth':[i for i in range(1,21,1)],
+            'min_samples_leaf':[i for i in range(1, 10, 1)],
+            'bootstrap':[False],
+            'random_state':[57]
+        }]
+
+    # ハイパーパラメータ値のリストparam_gridを指定し、
+    # グリッドサーチを行うGridSearchCVクラスをインスタンス化
+    gs = GridSearchCV(
+        estimator = rfc_gs,
+        param_grid = param_grid,
+        scoring = evaluation,
+        cv = n_cv,
+        n_jobs = 5
+    )
+
+    # fitさせる
+    gs = gs.fit(data_x, data_y)
+
+    # 評価関数
+    print('evaluation:', evaluation, '  ')
+    
+    # モデルの最良スコアを出力
+    print('best score:', gs.best_score_, '  ')
+
+    # 最良スコアとなるパラメータ値を出力
+    print('best params:', gs.best_params_, '  ')
+
+    return gs
+
+
+def general_preprocessing(df, ignore_cols=[], cls_cols=[], cate_cols=[], scaling=False, num_cols=[]):
+    """
+    一般的な前処理全般を行う関数。
+
+    Args:
+        df: DataFrame
+            前処理を行う対象のDataFrame。
+        
+        ignore_cols: list of str, optional(default=[])
+            前処理の対象外とするカラムのリスト。
+            目的変数やidなどを設定。
+        
+        cls_cols: list of str, optional(default=[])
+            階級に分ける対象のカラムのリスト。
+        
+        cate_cols: list of str, optional(default=[])
+            ダミー変数化する対象のカテゴリのカラムのリスト。
+        
+        scaling: bool or str, optional(default=False)
+            スケーリング処理をするかどうか。
+            'standard': Standard scaling
+            'minmax': MinMax scaling
+        
+        num_cols: list of str, optional(default=[])
+            スケーリング処理をする対象の数値カラムのリスト。
+    
+    Returns:
+        df0: DataFrame
+            前処理済のDataFrame
+    """
+    df0 = df.copy()
+    print('before shape:', df0.shape)
+
+    # 前処理対象外のカラムをチェック
+    ignore_df = df0[ignore_cols]
+    df0 = df0.drop(labels=ignore_cols, axis=1)
+
+    # 階級に分ける
+    if len(cls_cols) >= 1:
+        # スタージェスの公式を用いて階級に分ける
+        df0, bins = get_classes(
+            in_df = df,
+            columns = cls_cols,
+            n_classes = sturges_rule(len(df)),
+            drop = True
+            )
+        # カテゴリ変数に追加
+        cate_cols += list(bins.keys())
+        print('get_classes is done!')
+
+    # カテゴリ変数をダミー変数化
+    if len(cate_cols) >= 1:
+        # ダミー変数化
+        df0 = pd.get_dummies(df0, dummy_na=True, columns=cate_cols)
+        print('get_dummies is done!')
+
+    # スケール変換
+    if scaling == 'standard':
+        if len(num_cols) >= 1:
+            num_df = df0[num_cols]
+        else:
+            num_df = df0.select_dtypes(include='number')
+            num_cols = num_df.columns.tolist()
+        sscaler = StandardScaler() # インスタンスの作成
+        sscaler.fit(num_df)
+        sscaled = sscaler.transform(num_df)
+        sscaled_df = pd.DataFrame(sscaled, columns=num_cols)
+        df0.drop(labels=num_cols, axis=1, inplace=True)
+        df0 = pd.merge(df0, sscaled_df, left_index=True, right_index=True, on='outer')
+        print('standard scaling done!')
+
+    elif scaling == 'minmax':
+        if len(num_cols) >= 1:
+            num_df = df0[num_cols]
+        else:
+            num_df = df0.select_dtypes(include='number')
+            num_cols = num_df.columns.tolist()
+        mmscaler = MinMaxScaler(feature_range=(0, 1)) # インスタンスの作成
+        mmscaler.fit(num_df)
+        mmscaled = mmscaler.transform(num_df)
+        mmscaled_df = pd.DataFrame(mmscaled, columns=num_cols)
+        df0.drop(labels=num_cols, axis=1, inplace=True)
+        df0 = pd.merge(df0, mmscaled_df, left_index=True, right_index=True, on='outer')
+        print('minmax scaling done!')
+    
+    # 無視していたカラムと結合
+    df0 = pd.merge(df0, ignore_df, left_index=True, right_index=True, how='outer')
+    print('after shape:', df0.shape)
+
+    return df0
+    
 
