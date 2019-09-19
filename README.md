@@ -11,7 +11,7 @@ sample of data analysis
 ## start_jupyter.bat
 - 好きなディレクトリでJupyter Notebookを起動するbatファイルです
 - Remarks:
-    - [Qiita WindowsのDドライブでJupyter Notebookを起動するバッチファイル](https://qiita.com/AnnnPsinan414/items/7764723ed5183ea4b3e4)
+    - [[Qiita]WindowsのDドライブでJupyter Notebookを起動するバッチファイル](https://qiita.com/AnnnPsinan414/items/7764723ed5183ea4b3e4)
 
 ```bat
 cd /d %~dp0
