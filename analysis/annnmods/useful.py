@@ -4,12 +4,15 @@
 
 """
 @author: kosuke.asada
-便利関数
+便利module
 """
 
 
 import sys, os
 import gc
+import time
+import numpy as np
+import pandas as pd
 import configparser
 from glob import glob
 from pathlib import Path
@@ -18,11 +21,12 @@ from googletrans import Translator
 
 # 設定のimport
 from .mod_config import *
-# 自作関数のimport
-from .analysis import *
+# 自作moduleのimport
 from .calculation import *
-from .scraping import *
-from .visualization import *
+# from .scraping import *
+# from .visualization import *
+# from .preprocessing import *
+# from .analysis import *
 
 
 def print_usage(modules_dir=mod_dir, extension='py'):
@@ -107,7 +111,7 @@ def print_imports(modules_dir=mod_dir, extension='py'):
             全ての外部モジュール名のリスト。
     """
     print('■■■■■■■■■■■■■■■■■■■■')
-    print('■■■読み込み済みライブラリ一覧■■■■')
+    print('■■■内部で使用するライブラリ一覧■■■')
     print('■■■■■■■■■■■■■■■■■■■■')
     module_paths = list_segments(dir_path=modules_dir, extension=extension)
     all_imports = []
@@ -126,6 +130,26 @@ def print_imports(modules_dir=mod_dir, extension='py'):
     [print(ii) for ii in all_imports]
     print('■■■■■■■■■■■■■■■■■■■■')
     return all_imports
+
+
+def print_elapsed_time(start):
+    """
+    経過時間を表示する。
+    使用前にtime.time()でスタート時間を取得しておく。
+
+    Args:
+        start: float
+            計測開始時間。
+    
+    Returns:
+        elapsed_time: float
+            経過時間。
+    """
+    end = time.time()
+    elapsed_time = float(end - start)
+    rounded_elapsed_time = pro_round(num=elapsed_time, ndigits=1)
+    print('elapsed time:', rounded_elapsed_time, 's')
+    return elapsed_time
 
 
 def list_segments(dir_path='./', rescursive=False, extension=None):
@@ -229,4 +253,64 @@ def pro_makedirs(dir_path):
         os.makedirs(dir_path)
     else:
         pass
+
+
+def get_memory_df(dirlist=dir()):
+    """
+    メモリを確認する。
+    
+    Args:
+        dirlist: list
+            dir()の戻り値を格納する。
+    """
+    mem_cols = ['Variable Name', 'Memory']
+    memory_df = pd.DataFrame(columns=mem_cols)
+    try:
+        dirlist = list(dirlist)
+    except:
+        print('error')
+        return
+    for var_name in dirlist:
+        if not var_name.startswith("_"):
+            memory_df = memory_df.append(pd.DataFrame([[var_name, sys.getsizeof(eval(var_name))]], columns=mem_cols))
+    memory_df = memory_df.sort_values(by='Memory', ascending=False).reset_index(drop=True)
+    return memory_df
+
+
+def get_section_text(x, bins, bounds=[False, True]):
+    """
+    区間を示すテキストを取得する。
+
+    Args:
+        x: int or float
+            x
+        
+        bins: list of int or list of float
+            bins
+        
+        bounds: list of bool, optional(default=[False, True])
+            左端と右端を区間に含めるか。
+    
+    Returns:
+        ret: str
+            区間を示すテキスト。
+    
+    Examples:
+
+    bins = [-5.2, 0, 3.3, 8.8, 10.6]
+    am.get_section_text(x=0, bins=bins, bounds=[True, False])
+    # >> '[0, 3.3]'
+
+    am.get_section_text(x=0, bins=bins)
+    # >> '(-5.2, 0]'
+    """
+    n_bins = len(bins)
+    ret = 'out_of_range'
+    l='[' if bounds[0] else '('
+    r=']' if bounds[1] else ')'
+    for ii in range(n_bins-1):
+        if in_section(x, section=[bins[ii], bins[ii+1]], bounds=bounds):
+            ret = l + str(bins[ii]) + ', ' + str(bins[ii+1]) + r
+    return ret
+
 

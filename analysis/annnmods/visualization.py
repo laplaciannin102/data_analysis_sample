@@ -4,7 +4,7 @@
 
 """
 @author: kosuke.asada
-可視化用関数
+可視化用module
 """
 
 
@@ -13,16 +13,19 @@ import pandas as pd
 import matplotlib.pyplot as plt
 import pydotplus as pdp
 import seaborn as sns
+from sklearn.externals.six import StringIO
+from IPython.display import Image
 
 import japanize_matplotlib
 
 # 設定のimport
 from .mod_config import *
-# 自作関数のimport
-from .analysis import *
+# 自作moduleのimport
 from .calculation import *
-from .scraping import *
 from .useful import *
+from .scraping import *
+# from .preprocessing import *
+# from .analysis import *
 
 
 def graph(x, y, title='graph', xlabel='x', ylabel='y'):
@@ -95,13 +98,14 @@ def ratio_graph(x, y1, y2, xlabel='x', ylabel='y', y1label='y1', y2label='y2', r
     
     Examples:
     
+    import annnmods as am
     names = ['太郎', '次郎', '三郎', '四郎', '五郎', '六郎']
     n = len(names)
     np.random.seed(seed=57)
     df = pd.DataFrame({'name': names})
     df['パン'] = np.random.randint(0, 300, n)
     df['お米'] = np.random.randint(0, 300, n)
-    ratio_graph(df['name'], df['パン'], df['お米'], xlabel='名前', ylabel='食事回数', y1label='お米', y2label='パン', ratio_label='パンの割合')
+    am.ratio_graph(df['name'], df['パン'], df['お米'], xlabel='名前', ylabel='食事回数', y1label='お米', y2label='パン', ratio_label='パンの割合')
     """
     x = list(x)
     xstr_li = [str(ii) for ii in x]

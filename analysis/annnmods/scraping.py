@@ -4,13 +4,15 @@
 
 """
 @author: kosuke.asada
-スクレイピング用関数
+スクレイピング用module
 """
 
 
 import sys, os
 import gc
 import time
+import numpy as np
+import pandas as pd
 import json
 from urllib import parse
 import requests
@@ -18,11 +20,12 @@ from bs4 import BeautifulSoup
 
 # 設定のimport
 from .mod_config import *
-# 自作関数のimport
-from .analysis import *
+# 自作moduleのimport
 from .calculation import *
 from .useful import *
-from .visualization import *
+# from .visualization import *
+# from .preprocessing import *
+# from .analysis import *
 
 
 """
@@ -303,3 +306,80 @@ def dl_all_imgs(url, dir_path='./', extension=['jpg', 'png'], make_dir=True):
         except:
             print('error:', url)
             continue
+
+
+def gettext_fromurl(url):
+    """
+    urlで指定したページのtitleとbodyのtextを抜き出す。
+
+    Args:
+        url: str
+            titleとtextを抜き出したいページのURL。
+    
+    Returns:
+        title, text: tuple
+            title: str
+                ページのhtmlのheaderのtitle。
+                取得に失敗した時は'get title error'
+            
+            text: str
+                ページのhtmlのbodyのtext。
+                取得に失敗した時は'get text error'
+    """
+    url = str(url)
+    try:
+        sp = get_soup(url)
+    except:
+        print('get text error:', url)
+        print()
+        return 'get title error', 'get text error'
+    
+    # title
+    title = sp.title.string
+    title = str(title)
+    
+    # bodyのtext
+    for script in sp(['script', 'style']):
+        script.decompose()
+    text = sp.get_text()
+    lines = [line.strip() for line in text.splitlines()]
+    text="\n".join(line for line in lines if line)
+    return title, text
+
+
+def get_page_df(urls):
+    """
+    urlsに含まれるURLのページのURLとtitleとtextをまとめたDataFrameを作成し返す。
+
+    Args:
+        urls: list of str
+            取得したいページのURLのリスト。
+    
+    Returns:
+        page_df: DataFrame
+            各ページの情報をまとめたDataFrame。
+    
+    Examples:
+
+    import annnmods as am
+    google = am.Google()
+
+    # 「ポケモン」をGoogle検索
+    poke_result = google.Search('ポケモン', type='text', maximum=3)
+    poke_df = am.get_page_df(poke_result)
+    """
+    page_cols = ['url', 'title', 'text']
+
+    # pageデータをまとめるDataFrame
+    page_df = pd.DataFrame(columns=page_cols)
+
+    for url in urls:
+        url = str(url)
+        title, text = gettext_fromurl(url)
+        time.sleep(1) # 1秒待つ
+        tmp = pd.DataFrame([[url, title, text]], columns=page_cols)
+        page_df = page_df.append(tmp) # 元のDataFrameに追加する
+    page_df = page_df.reset_index(drop=True)    
+    return page_df
+
+
