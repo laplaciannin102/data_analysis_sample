@@ -1951,9 +1951,12 @@ class StackingManager():
             # train base model
             for name in bm_keys:
                 self.base_models_dict[name].fit(data_x, data_y)
+                print(name + ' model is trained!')
             
             # ベース学習済みフラグ
             self.base_is_trained = True
+            print('all base models are trained!')
+            print()
         else:
             print('train error: length of x and length of y are different')
 
@@ -2042,6 +2045,8 @@ class StackingManager():
 
         # メタ学習済みフラグ
         self.meta_is_trained = True
+        print('meta model is trained!')
+        print()
     
 
     def predict_meta(self, base_predicts):

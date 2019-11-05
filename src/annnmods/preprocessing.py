@@ -1109,7 +1109,7 @@ def gen_pp(df, cols_dict):
 
     # すでにダミー変数カラムが設定されている場合はそれに従う。
     if not (dummy_cols is None):
-        cols0 = sorted((set(dummy_cols0)-set(dummy_cols)), key=dummy_cols.index) # difference
+        cols0 = sorted((set(dummy_cols0)-set(dummy_cols)), key=dummy_cols0.index) # difference
         cols1 = sorted((set(dummy_cols)-set(dummy_cols0)), key=dummy_cols.index) # intersection
         df0 = df0.drop(labels=cols0, axis=1)
         for ii in cols1:
