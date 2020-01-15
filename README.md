@@ -8,7 +8,7 @@ sample of data analysis
   - simple is the best.
 
 - [**python_simple_analysis_002**](./python_simple_analysis_002/)
-  - python_simple_analysis_001に自作関数を追加するなど。おすすめ。
+  - python_simple_analysis_001に自作関数を追加するなど。推奨。
 
 - [**python_simple_analysis_all**](./python_simple_analysis_all/)
   - python_simple_analysisを全て格納。
@@ -19,7 +19,7 @@ sample of data analysis
 ### Others
 - start_jupyter.bat
 
-## directory structure
+## Directory structure
 
 - **input**
   - 入力データ格納ディレクトリ。
@@ -33,7 +33,10 @@ sample of data analysis
   - 分析用program格納ディレクトリ。Source Code。
   - ここにsample programを置いています。
 
-## start_jupyter.bat
+## Explanation of files
+
+### start_jupyter.bat
+
 - 好きなディレクトリでJupyter Notebookを起動するbatファイルです
 - Remarks:
     - [[Qiita]WindowsのDドライブでJupyter Notebookを起動するバッチファイル](https://qiita.com/AnnnPsinan414/items/7764723ed5183ea4b3e4)
